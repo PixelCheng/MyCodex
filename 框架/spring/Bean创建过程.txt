@@ -1,0 +1,38 @@
+1.实例化
+   获取BeanDefinition对象
+2.属性注入
+   处理Aware接口
+   填充属性，执行BeanPostProcessor前置方法
+3.初始化
+   @postConstruct
+   InitializingBean的afterPropertiesSet方法
+   自定义init-method
+   执行BeanPostProcessor后置方法
+4.销毁
+   @preDestroy
+   DisposableBean的方法
+   自定义destroy
+
+
+1.Constructor -> 构造对象
+2.Populate Properties -> 依赖注入
+----- aware接口调用
+3.BeanPostProcessor.postProcessBeforeInitialization()
+4.@PostConstruct
+5.InitializingBean.afterPropertiesSet()
+6.Custom init-method
+7.BeanPostProcessor.postProcessAfterInitialization() -> (AOP Proxy Creation Here!)
+8.Bean is Ready for Use
+... (Container Running) ...
+9.@PreDestroy
+10.DisposableBean.destroy()
+11.Custom destroy-method
+
+
+
+a和b循环依赖，a实例化后，同时把自己的工厂对象放到三级缓存中，注入属性发现依赖b，于是从1级缓存找，没有b，那就从二级找，也没有，三级找也没有，于是b开始实例化，同样获得把自己先放到3级缓存，随后注入发现需要a，此时先从1级缓存查，没有，二级没有，三级有，于是调用工程方法获得a早期对象，此时会判断是不是需要生成a的代理对象，然后将a或者a的代理对象放到2级缓存，同时删除a的3级缓存，这个过程是双重检查锁，然后b接着注入其他属性，再调用beanpostprocesser的前置方法，然后初始化，然后判断是不是需要生成b的代理对象，把最终结果放到一级缓存，这个过程b没有到过二级缓存的，销毁b的3级缓存。
+因为一级缓存有了b，所以a可以继续注入b的对象或者代理对象，然后在初始化阶段中，在后置的BeanPostProcessor后置方法中，发现a或者a的代理对象已经存在2级缓存了，将其从2级删除，放到1级缓存。
+完成a和b的创建后，才会继续创建其他对象，此时a和b都只存在于1级缓存。
+
+有两个地方检查是否创建代理对象：1.循环依赖时，从3级缓存创建早期引用时，检查是否需要创建a的代理对象到2级缓存
+2.初始化完成的后置方法中，检查bean自身是不是要要创建代理对象到1级缓存。
